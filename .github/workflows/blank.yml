@@ -1,0 +1,42 @@
+
+#!/bin/bash
+
+echo "Bắt đầu tải xuống các tệp ISO..."
+wget -O win.iso https://archive.org/download/win10pro1909.752liteplusoprekin.com/Win10Pro_1909.752_LitePlus_oprekin.com.iso
+wget virtio.iso https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/archive-virtio/virtio-win-0.1.240-1/virtio-win-0.1.240.iso
+echo "Tải xuống hoàn tất."
+
+echo "Cập nhật hệ thống và cài đặt QEMU/KVM..."
+sudo apt update
+sudo apt install qemu-kvm -y
+echo "Cài đặt QEMU/KVM hoàn tất."
+
+echo "Tạo ổ đĩa ảo nvme_disk.qcow2..."
+qemu-img create -f qcow2 nvme_disk.qcow2 50G
+echo "Tạo ổ đĩa ảo hoàn tất."
+
+echo "khởi động máy ảo "
+sudo qemu-system-x86_64 \
+-M q35,accel=kvm,hpet=off \
+-cpu host,hv-time,hv-relaxed,hv-vapic,hv-spinlocks=0x1fff,kvm=on,+invtsc,migratable=off,+hypervisor \
+-smp cores=3,sockets=1,threads=1,maxcpus=3,cpus=3 \
+-m 4G \
+-device qemu-xhci,id=xhci \
+-device usb-tablet,bus=xhci.0 \
+-device usb-kbd,bus=xhci.0 \
+-drive file=win.iso,media=cdrom,if=none,id=cdrom0 -device ide-cd,drive=cdrom0,bus=ide.0 \
+-drive file=virtio.iso,media=cdrom,if=none,id=cdrom1 -device ide-cd,drive=cdrom1,bus=ide.1 \
+-drive file=nvme_disk.qcow2,if=none,id=disk0,format=qcow2,cache=writeback,discard=unmap,aio=threads \
+-device virtio-blk-pci,drive=disk0,scsi=off,disable-legacy=on \
+-vga virtio \
+-device virtio-net-pci,netdev=n0 \
+-netdev user,id=n0,hostfwd=tcp::3389-:3389 \
+-device virtio-serial-pci \
+-device virtio-balloon-pci \
+-device intel-hda \
+-daemonize \
+-rtc base=localtime,clock=host,driftfix=slew \
+-no-user-config -nodefaults \
+-vnc :0 # Thêm dòng này để truy cập VNC qua localhost:5900
+
+echo" hoàn tất máy ảo"
